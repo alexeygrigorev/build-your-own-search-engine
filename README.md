@@ -205,5 +205,52 @@ cosine_similarity(X, q)
 
 The TF-IDF vectorizer already outputs a normalized vectors, so the results are identical. We won't go into details of how it works, but you can check "Introduction to Infromation Retrieval" if you want to learn more. 
 
+Let's now do it for all the documents:
+
+```python
+fields = ['section', 'question', 'text']
+transformers = {}
+matrices = {}
+
+for field in fields:
+    cv = TfidfVectorizer(stop_words='english', min_df=3)
+    X = cv.fit_transform(df[field])
+
+    transformers[field] = cv
+    matrices[field] = X
+
+transformers['text'].get_feature_names_out()
+matrices['text']
+```
+
+Let's now do search with the text field:
+
+```python
+query = "I just singned up. Is it too late to join the course?"
+
+q = transformers['text'].transform([query])
+score = cosine_similarity(matrices['text'], q).flatten()
+```
+
+Let's do it only for the data engineering course:
+
+```python
+mask = (df.course == 'data-engineering-zoomcamp').values
+score = score * mask
+```
+
+And get the top results:
+
+```python
+import numpy as np
+
+idx = np.argsort(-score)[:10]
+```
+
+Note: [np.argpartition](https://numpy.org/doc/stable/reference/generated/numpy.argpartition.html) is a more efficient way of doing the same thing
+
+Get the docs:
+
+```python
 
 
