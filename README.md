@@ -18,39 +18,28 @@ What we will do:
 
 ## Workshop Outline
 
-1. **Preparing the Environment** (5 minutes)
-
-
-2. **Basics of Text Search** (10 minutes)
-
-- Basics of Information Retrieval
-- Introduction to vector spaces, bag of words, and TF-IDF
-
-
-3. **Implementing Basic Text Search** (15 minutes)
-
-- TF-IDF scoring with sklearn
-- Keyword filtering using pandas
-
-4. **Vector Search** (20 minutes)
-
-- Vector embeddings
-- Word2Vec and other approaches for word embeddings
-- LSA (Latent Semantic Analysis) for document embeddings
-- Implementing vector search with LSA
-- BERT embeddings 
-
+1. **Preparing the Environment**
+2. **Basics of Text Search**
+    - Basics of Information Retrieval
+    - Introduction to vector spaces, bag of words, and TF-IDF
+3. **Implementing Basic Text Search**
+    - TF-IDF scoring with sklearn
+    - Keyword filtering using pandas
+    - Creating a class for relevance search
+4. **Embeddings and Vector Search**
+    - Vector embeddings
+    - Word2Vec and other approaches for word embeddings
+    - LSA (Latent Semantic Analysis) for document embeddings
+    - Implementing vector search with LSA
+    - BERT embeddings 
 5. **Combining Text and Vector Search** (5 minutes)
-
-
 6. **Practical Implementation Aspects and Tools** (10 minutes)
-
-- Real-world implementation tools:
-    * inverted indexes for text search
-    * LSH for vector search (using random projections)
-- Technologies:
-    * Lucene/Elasticsearch for text search
-    * FAISS and and other vector databases
+    - Real-world implementation tools:
+        * inverted indexes for text search
+        * LSH for vector search (using random projections)
+    - Technologies:
+        * Lucene/Elasticsearch for text search
+        * FAISS and and other vector databases
 
 
 ## 1. Preparing the environment
@@ -60,7 +49,7 @@ In the workshop, we'll use Github Codespaces, but you can use any env
 We need to install the following libraries:
 
 ```bash
-pip install requests jupyter pandas scikit-learn transformers
+pip install requests pandas scikit-learn transformers jupyter
 ```
 
 Start jupyter:
@@ -97,8 +86,6 @@ df = pd.DataFrame(documents, columns=['course', 'section', 'question', 'text'])
 df.head()
 ```
 
-
-
 ## 2. Basics of Text Search
 
 - **Information Retrieval** - The process of obtaining relevant information from large datasets based on user queries.
@@ -107,8 +94,12 @@ df.head()
 - **TF-IDF (Term Frequency-Inverse Document Frequency)** - A statistical measure used to evaluate how important a word is to a document in a collection or corpus. It increases with the number of times a word appears in the document but is offset by the frequency of the word in the corpus.
 
 
+## 3. Implementing Basic Text Search
 
 Let's implement it ourselves.
+
+
+### Keyword filtering
 
 First, keyword filtering:
 
@@ -116,6 +107,7 @@ First, keyword filtering:
 df[df.course == 'data-engineering-zoomcamp'].head()
 ```
 
+### Vectorization
 
 For Count Vectorizer and TF-IDF we will first use a simple example
 
@@ -156,6 +148,8 @@ names = cv.get_feature_names_out()
 df_docs = pd.DataFrame(X.toarray(), columns=names).T
 df_docs.round(2)
 ```
+
+### Query-Document Similarity
 
 We represent the query in the same vector space - i.e. using the same vectorizer:
 
@@ -205,6 +199,8 @@ cosine_similarity(X, q)
 
 The TF-IDF vectorizer already outputs a normalized vectors, so the results are identical. We won't go into details of how it works, but you can check "Introduction to Infromation Retrieval" if you want to learn more. 
 
+### Vectorizing all the documents
+
 Let's now do it for all the documents:
 
 ```python
@@ -222,6 +218,8 @@ for field in fields:
 transformers['text'].get_feature_names_out()
 matrices['text']
 ```
+
+### Search
 
 Let's now do search with the text field:
 
@@ -252,5 +250,120 @@ Note: [np.argpartition](https://numpy.org/doc/stable/reference/generated/numpy.a
 Get the docs:
 
 ```python
+df.iloc[idx].text
+```
+
+### Search with all the fields & boosting + filtering
+
+We can do it for all the fields. Let's also boost one of the fields - `question` - to give it more importance than to others 
+
+```python
+boost = {'question': 3.0}
+
+score = np.zeros(len(df))
+
+for f in fields:
+    b = boost.get(f, 1.0)
+    q = transformers[f].transform([query])
+    s = cosine_similarity(matrices[f], q).flatten()
+    score = score + b * s
+```
+
+And add filters (in this case, only one):
+
+```python
+filters = {
+    'course': 'data-engineering-zoomcamp'
+}
+
+for field, value in filters.items():
+    mask = (df[field] == value).values
+    score = score * mask
+```
+
+Getting the results:
+
+```python
+idx = np.argsort(-score)[:10]
+results = df.iloc[idx]
+results.to_dict(orient='records')
+```
+
+### Putting it all together 
+
+Let's create a class for us to use:
+
+```python
+class TextSearch:
+
+    def __init__(self, text_fields):
+        self.text_fields = text_fields
+        self.matrices = {}
+        self.vectorizers = {}
+
+    def fit(self, records, vectorizer_params={}):
+        self.df = pd.DataFrame(records)
+
+        for f in self.text_fields:
+            cv = TfidfVectorizer(**vectorizer_params)
+            X = cv.fit_transform(self.df[f])
+            self.matrices[f] = X
+            self.vectorizers[f] = cv
+
+    def search(self, query, n_results=10, boost={}, filters={}):
+        score = np.zeros(len(self.df))
+
+        for f in self.text_fields:
+            b = boost.get(f, 1.0)
+            q = self.vectorizers[f].transform([query])
+            s = cosine_similarity(self.matrices[f], q).flatten()
+            score = score + b * s
+
+        for field, value in filters.items():
+            mask = (self.df[field] == value).values
+            score = score * mask
+
+        idx = np.argsort(-score)[:n_results]
+        results = self.df.iloc[idx]
+        return results.to_dict(orient='records')
+```
+
+Using it:
+
+```python
+index = TextSearch(
+    text_fields=['section', 'question', 'text']
+)
+index.fit(documents)
+
+index.search(
+    query='I just singned up. Is it too late to join the course?',
+    n_results=5,
+    boost={'question': 3.0},
+    filters={'course': 'data-engineering-zoomcamp'}
+)
+```
+
+You can fild the implementation here too if you want to use it: https://github.com/alexeygrigorev/minsearch
 
 
+**Note**: this is a toy example for illustrating how relevance search works. It's not meant to be used in production.
+
+## 4. Embeddings and Vector Search
+
+Problem with text - only exact matches. How about synonyms? 
+
+### What are Embeddings?
+
+- **Conversion to Numbers:** Embeddings transform items like words or movies into vectors of numbers, making them understandable to computers.
+
+- **Capturing Similarity:** They ensure similar items have similar numerical vectors, illustrating their closeness in terms of characteristics.
+
+- **Dimensionality Reduction:** Embeddings reduce complex characteristics into simpler, manageable numerical forms while keeping essential features.
+
+- **Use in Machine Learning:** These numerical vectors are used in machine learning models for tasks such as recommendations, text analysis, and pattern recognition.
+
+
+### SVD
+
+from sklearn.decomposition import TruncatedSVD
