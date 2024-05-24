@@ -49,7 +49,7 @@ In the workshop, we'll use Github Codespaces, but you can use any env
 We need to install the following libraries:
 
 ```bash
-pip install requests pandas scikit-learn transformers jupyter
+pip install requests pandas scikit-learn jupyter
 ```
 
 Start jupyter:
@@ -135,7 +135,9 @@ df_docs = pd.DataFrame(X.toarray(), columns=names).T
 df_docs
 ```
 
-Now replace it with TfidfVectorizer:
+This representation is called "bag of words" - here we ignore the order of words, just focus on the words themselves. In many cases this is sufficient and gives pretty good results already.
+
+Now let's replace it with `TfidfVectorizer`:
 
 ```python
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -355,15 +357,219 @@ Problem with text - only exact matches. How about synonyms?
 
 ### What are Embeddings?
 
-- **Conversion to Numbers:** Embeddings transform items like words or movies into vectors of numbers, making them understandable to computers.
-
+- **Conversion to Numbers:** Embeddings transform different words, sentences and documents into dense vectors (arrays with numbers).
 - **Capturing Similarity:** They ensure similar items have similar numerical vectors, illustrating their closeness in terms of characteristics.
-
-- **Dimensionality Reduction:** Embeddings reduce complex characteristics into simpler, manageable numerical forms while keeping essential features.
-
+- **Dimensionality Reduction:** Embeddings reduce complex characteristics into vectors.
 - **Use in Machine Learning:** These numerical vectors are used in machine learning models for tasks such as recommendations, text analysis, and pattern recognition.
-
 
 ### SVD
 
+Singular Value Decomposition is the simplest way to turn Bag-of-Words representation into embeddings
+
+This way we still don't preserve the word order (because it wasn't in the Bag-of-Words representation) but we reduce dimensionality and capture synonyms.
+
+We won't go into mathematics, it's sufficient to know that SVD "compresses" our input vectors in such a way that as much as possible of the original information is retained. 
+
+This compression is lossy compression - meaning that we won't be able to restore the 100% of the original vector, but the result is close enough.
+
+Example with images:
+
+<img src="http://habrastorage.org/files/855/a65/c62/855a65c624dc4174b526fb5e03b98555.png" />
+
+Let's use the vectorizer for the "text" field and turn it into embeddings 
+
+```python
 from sklearn.decomposition import TruncatedSVD
+
+X = matrices['text']
+cv = transformers['text']
+
+svd = TruncatedSVD(n_components=16)
+X_emb = svd.fit_transform(X)
+
+X_emb[0]
+```
+
+For query:
+
+```python
+query = 'I just singned up. Is it too late to join the course?'
+
+Q = cv.transform([query])
+Q_emb = svd.transform(Q)
+Q_emb[0]
+```
+
+Similarity between query and the document:
+
+```python
+np.dot(X_emb[0], Q_emb[0])
+```
+
+Let's do it for all the documents. It's the same as previously, except we do it on embeddings, not on sparce matrices:
+
+```python
+score = cosine_similarity(X_emb, Q_emb).flatten()
+idx = np.argsort(-score)[:10]
+list(df.loc[idx].text)
+```
+
+### Non-Negative Matrix Factorization
+
+SVD creates values with negative numbers. It's difficult to interpet them. 
+
+NMF (Non-Negative Matrix Factorization) is a similar concept, except for non-negative input matrices it produces non-negative results.
+
+We can interpret each of the columns (features) of the embeddings as different topic/concents and to what extent this document is about this concept.
+
+Let's use it for the documents:
+
+```python
+nmf = NMF(n_components=16)
+X_emb = nmf.fit_transform(X)
+X_emb[0]
+```
+
+And the query:
+
+```python
+Q = cv.transform([query])
+Q_emb = nmf.transform(Q)
+Q_emb[0]
+```
+
+We compute the similarity in the same way as previously:
+
+```python
+score = cosine_similarity(X_emb, Q_emb).flatten()
+idx = np.argsort(-score)[:10]
+list(df.loc[idx].text)
+```
+
+### BERT 
+
+The problem with the previous two approaches is that they don't take into account the word order. They just treat all the words separately (that's why it's called "Bag-of-Words")
+
+BERT and other transformer models don't have this problem.
+
+Let's create embeddings with BERT. We will use the Hugging Face library for that
+
+```bash
+pip install transformers tqdm
+``` 
+
+Use it:
+
+```python
+import torch
+from transformers import BertModel, BertTokenizer
+
+tokenizer = BertTokenizer.from_pretrained("bert-base-uncased")
+model = BertModel.from_pretrained("bert-base-uncased")
+model.eval()  # Set the model to evaluation mode if not training
+```
+
+We need:
+
+- tokenizer - for turning text into vectors
+- model - for compressing the text into embeddings
+
+First, we tokenize the text
+
+```python
+texts = [
+    "Yes, we will keep all the materials after the course finishes.",
+    "You can follow the course at your own pace after it finishes"
+]
+encoded_input = tokenizer(texts, padding=True, truncation=True, return_tensors='pt')
+```
+
+Then we compute the embeddings:
+
+```python
+with torch.no_grad():  # Disable gradient calculation for inference
+    outputs = model(**encoded_input)
+    hidden_states = outputs.last_hidden_state
+```
+
+Now we need to compress the embeddings:
+
+```python
+sentence_embeddings = hidden_states.mean(dim=1)
+sentence_embeddings.shape
+```
+
+And convert them to a numpy array
+
+```python
+X_emb = sentence_embeddings.numpy()
+```
+
+Note that if use a GPU, first you need to move your tensors to CPU
+
+
+```python
+sentence_embeddings_cpu = sentence_embeddings.cpu()
+```
+
+Let's now compute it for our texts. We'll do it in batches. First, we define a function for batching:
+
+```python
+def make_batches(seq, n):
+    result = []
+    for i in range(0, len(seq), n):
+        batch = seq[i:i+n]
+        result.append(batch)
+    return result
+```
+
+And use it:
+
+```python
+texts = df['text'].tolist()
+text_batches = make_batches(texts, 8)
+
+all_embeddings = []
+
+for batch in tqdm(text_batches):
+    encoded_input = tokenizer(batch, padding=True, truncation=True, return_tensors='pt')
+
+    with torch.no_grad():
+        outputs = model(**encoded_input)
+        hidden_states = outputs.last_hidden_state
+        
+        batch_embeddings = hidden_states.mean(dim=1)
+        batch_embeddings_np = batch_embeddings.cpu().numpy()
+        all_embeddings.append(batch_embeddings_np)
+
+final_embeddings = np.vstack(all_embeddings)
+```
+
+Let's put it into a function:
+
+```python
+def compute_embeddings(texts, batch_size=8):
+    text_batches = make_batches(texts, 8)
+    
+    all_embeddings = []
+    
+    for batch in tqdm(text_batches):
+        encoded_input = tokenizer(batch, padding=True, truncation=True, return_tensors='pt')
+    
+        with torch.no_grad():
+            outputs = model(**encoded_input)
+            hidden_states = outputs.last_hidden_state
+            
+            batch_embeddings = hidden_states.mean(dim=1)
+            batch_embeddings_np = batch_embeddings.cpu().numpy()
+            all_embeddings.append(batch_embeddings_np)
+    
+    final_embeddings = np.vstack(all_embeddings)
+    return final_embeddings
+```
+
+And use it:
+
+
+```python
+X_text = compute_embeddings(df['text'].tolist())
