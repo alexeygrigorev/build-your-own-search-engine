@@ -112,7 +112,7 @@ df[df.course == 'data-engineering-zoomcamp'].head()
 For Count Vectorizer and TF-IDF we will first use a simple example
 
 ```python
-documents = [
+docs_example = [
     "Course starts on 15th Jan 2024",
     "Prerequisites listed on GitHub",
     "Submit homeworks after start date",
@@ -196,6 +196,7 @@ Bottom line: it's a very fast and effective method of computing similarities
 In practice, we usually use cosine similarity:
 
 ```python
+from sklearn.metrics.pairwise import cosine_similarity
 cosine_similarity(X, q)
 ```
 
@@ -425,6 +426,7 @@ We can interpret each of the columns (features) of the embeddings as different t
 Let's use it for the documents:
 
 ```python
+from sklearn.decomposition import NMF
 nmf = NMF(n_components=16)
 X_emb = nmf.fit_transform(X)
 X_emb[0]
@@ -455,7 +457,7 @@ BERT and other transformer models don't have this problem.
 Let's create embeddings with BERT. We will use the Hugging Face library for that
 
 ```bash
-pip install transformers tqdm
+pip install transformers tqdm torch
 ``` 
 
 Use it:
@@ -526,6 +528,7 @@ def make_batches(seq, n):
 And use it:
 
 ```python
+from tqdm.auto import tqdm
 texts = df['text'].tolist()
 text_batches = make_batches(texts, 8)
 
