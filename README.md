@@ -227,7 +227,7 @@ matrices['text']
 Let's now do search with the text field:
 
 ```python
-query = "I just singned up. Is it too late to join the course?"
+query = "I just signed up. Is it too late to join the course?"
 
 q = transformers['text'].transform([query])
 score = cosine_similarity(matrices['text'], q).flatten()
@@ -340,7 +340,7 @@ index = TextSearch(
 index.fit(documents)
 
 index.search(
-    query='I just singned up. Is it too late to join the course?',
+    query='I just signed up. Is it too late to join the course?',
     n_results=5,
     boost={'question': 3.0},
     filters={'course': 'data-engineering-zoomcamp'}
@@ -394,7 +394,7 @@ X_emb[0]
 For query:
 
 ```python
-query = 'I just singned up. Is it too late to join the course?'
+query = 'I just signed up. Is it too late to join the course?'
 
 Q = cv.transform([query])
 Q_emb = svd.transform(Q)
@@ -407,7 +407,7 @@ Similarity between query and the document:
 np.dot(X_emb[0], Q_emb[0])
 ```
 
-Let's do it for all the documents. It's the same as previously, except we do it on embeddings, not on sparce matrices:
+Let's do it for all the documents. It's the same as previously, except we do it on embeddings, not on sparse matrices:
 
 ```python
 score = cosine_similarity(X_emb, Q_emb).flatten()
@@ -421,7 +421,7 @@ SVD creates values with negative numbers. It's difficult to interpet them.
 
 NMF (Non-Negative Matrix Factorization) is a similar concept, except for non-negative input matrices it produces non-negative results.
 
-We can interpret each of the columns (features) of the embeddings as different topic/concents and to what extent this document is about this concept.
+We can interpret each of the columns (features) of the embeddings as different topic/concepts and to what extent this document is about this concept.
 
 Let's use it for the documents:
 
@@ -576,3 +576,4 @@ And use it:
 
 ```python
 X_text = compute_embeddings(df['text'].tolist())
+```
