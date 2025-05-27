@@ -112,7 +112,7 @@ df[df.course == 'data-engineering-zoomcamp'].head()
 For Count Vectorizer and TF-IDF we will first use a simple example
 
 ```python
-documents = [
+docs_example = [
     "Course starts on 15th Jan 2024",
     "Prerequisites listed on GitHub",
     "Submit homeworks after start date",
@@ -196,6 +196,7 @@ Bottom line: it's a very fast and effective method of computing similarities
 In practice, we usually use cosine similarity:
 
 ```python
+from sklearn.metrics.pairwise import cosine_similarity
 cosine_similarity(X, q)
 ```
 
@@ -226,7 +227,7 @@ matrices['text']
 Let's now do search with the text field:
 
 ```python
-query = "I just singned up. Is it too late to join the course?"
+query = "I just signed up. Is it too late to join the course?"
 
 q = transformers['text'].transform([query])
 score = cosine_similarity(matrices['text'], q).flatten()
@@ -339,7 +340,7 @@ index = TextSearch(
 index.fit(documents)
 
 index.search(
-    query='I just singned up. Is it too late to join the course?',
+    query='I just signed up. Is it too late to join the course?',
     n_results=5,
     boost={'question': 3.0},
     filters={'course': 'data-engineering-zoomcamp'}
@@ -393,7 +394,7 @@ X_emb[0]
 For query:
 
 ```python
-query = 'I just singned up. Is it too late to join the course?'
+query = 'I just signed up. Is it too late to join the course?'
 
 Q = cv.transform([query])
 Q_emb = svd.transform(Q)
@@ -406,7 +407,7 @@ Similarity between query and the document:
 np.dot(X_emb[0], Q_emb[0])
 ```
 
-Let's do it for all the documents. It's the same as previously, except we do it on embeddings, not on sparce matrices:
+Let's do it for all the documents. It's the same as previously, except we do it on embeddings, not on sparse matrices:
 
 ```python
 score = cosine_similarity(X_emb, Q_emb).flatten()
@@ -420,11 +421,12 @@ SVD creates values with negative numbers. It's difficult to interpet them.
 
 NMF (Non-Negative Matrix Factorization) is a similar concept, except for non-negative input matrices it produces non-negative results.
 
-We can interpret each of the columns (features) of the embeddings as different topic/concents and to what extent this document is about this concept.
+We can interpret each of the columns (features) of the embeddings as different topic/concepts and to what extent this document is about this concept.
 
 Let's use it for the documents:
 
 ```python
+from sklearn.decomposition import NMF
 nmf = NMF(n_components=16)
 X_emb = nmf.fit_transform(X)
 X_emb[0]
@@ -455,7 +457,7 @@ BERT and other transformer models don't have this problem.
 Let's create embeddings with BERT. We will use the Hugging Face library for that
 
 ```bash
-pip install transformers tqdm
+pip install transformers tqdm torch
 ``` 
 
 Use it:
@@ -526,6 +528,7 @@ def make_batches(seq, n):
 And use it:
 
 ```python
+from tqdm.auto import tqdm
 texts = df['text'].tolist()
 text_batches = make_batches(texts, 8)
 
@@ -573,3 +576,5 @@ And use it:
 
 ```python
 X_text = compute_embeddings(df['text'].tolist())
+```
+
