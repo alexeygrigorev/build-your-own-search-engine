@@ -11,7 +11,7 @@ What we will do:
     * [DE Zoomcamp](https://docs.google.com/document/d/19bnYs80DwuUimHM65UV3sylsCn2j1vziPOwzBwQrebw/edit)
     * [ML Zoomcamp](https://docs.google.com/document/d/1LpPanc33QJJ6BSsyxVg-pWNMplal84TdZtq10naIhD8/edit)
     * [MLOps Zoomcamp](https://docs.google.com/document/d/12TlBfhIiKtyBv8RnsoJR6F72bkPDGEvPOItJIxaEzE0/edit)
-* Create a search engine for retreiving these documents 
+* Create a search engine for retrieving these documents 
 * Later the results can be used for a [Q&A RAG system](https://github.com/alexeygrigorev/llm-rag-workshop) 
 * [Reference implementation for text search](https://github.com/alexeygrigorev/minsearch)
 
@@ -200,7 +200,7 @@ from sklearn.metrics.pairwise import cosine_similarity
 cosine_similarity(X, q)
 ```
 
-The TF-IDF vectorizer already outputs a normalized vectors, so the results are identical. We won't go into details of how it works, but you can check "Introduction to Infromation Retrieval" if you want to learn more. 
+The TF-IDF vectorizer already outputs a normalized vectors, so the results are identical. We won't go into details of how it works, but you can check "Introduction to Information Retrieval" if you want to learn more. 
 
 ### Vectorizing all the documents
 
@@ -347,7 +347,7 @@ index.search(
 )
 ```
 
-You can fild the implementation here too if you want to use it: https://github.com/alexeygrigorev/minsearch
+You can find the implementation here too if you want to use it: https://github.com/alexeygrigorev/minsearch
 
 
 **Note**: this is a toy example for illustrating how relevance search works. It's not meant to be used in production.
@@ -507,7 +507,7 @@ And convert them to a numpy array
 X_emb = sentence_embeddings.numpy()
 ```
 
-Note that if use a GPU, first you need to move your tensors to CPU
+Note that if you use a GPU, first you need to move your tensors to CPU
 
 
 ```python
